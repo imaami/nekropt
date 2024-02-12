@@ -152,38 +152,6 @@ struct letopt {
 	#undef increment
 };
 
-#define parse_str(T, tag, chr, str, ...)                           \
-	if (!__builtin_strncmp(args->p.p, str, sizeof str - 1U)) { \
-		call(T##_str_opt,                                  \
-		     gen_arg_list(T, tag, chr, str, __VA_ARGS__),) \
-	}
-
-#define boolean_str_opt(T, tag, chr, str, ...)  \
-	if (!args->p.p[sizeof str - 1U]) {      \
-		args->m_##tag = true;           \
-		return OPT_##tag;               \
-	}
-
-#define number_str_opt(T, tag, chr, str, doc, a, def, min, max, ...) \
-	int e = letopt_get_long_opt_arg(&args->p, sizeof str - 1U);  \
-	if (!e) {                                                    \
-		if (letopt_get_number_arg(&args->p, &args->m_##tag,  \
-		                          min, max))                 \
-			return OPT_##tag;                            \
-		break;                                               \
-	}                                                            \
-	if (e != EAGAIN)                                             \
-		break;
-
-#define string_str_opt(T, tag, chr, str, ...)                        \
-	int e = letopt_get_long_opt_arg(&args->p, sizeof str - 1U);  \
-	if (!e) {                                                    \
-		args->m_##tag = args->p.p;                           \
-		return OPT_##tag;                                    \
-	}                                                            \
-	if (e != EAGAIN)                                             \
-		break;
-
 __attribute__((always_inline))
 static inline enum opt_tag
 handle_long_opt (struct letopt *const args)
@@ -197,50 +165,50 @@ handle_long_opt (struct letopt *const args)
 	                       const int64_t              min,
 	                       const int64_t              max);
 
+	#define parse_str(T, tag, chr, str, ...)                           \
+		if (!__builtin_strncmp(args->p.p, str, sizeof str - 1U)) { \
+			call(T##_str_opt,                                  \
+			     gen_arg_list(T, tag, chr, str, __VA_ARGS__),) \
+		}
+
+	#define boolean_str_opt(T, tag, chr, str, ...)  \
+		if (!args->p.p[sizeof str - 1U]) {      \
+			args->m_##tag = true;           \
+			return OPT_##tag;               \
+		}
+
+	#define number_str_opt(T, tag, chr, str, doc, a, def, min, max, ...) \
+		int e = letopt_get_long_opt_arg(&args->p, sizeof str - 1U);  \
+		if (!e) {                                                    \
+			if (letopt_get_number_arg(&args->p, &args->m_##tag,  \
+			                          min, max))                 \
+				return OPT_##tag;                            \
+			break;                                               \
+		}                                                            \
+		if (e != EAGAIN)                                             \
+			break;
+
+	#define string_str_opt(T, tag, chr, str, ...)                        \
+		int e = letopt_get_long_opt_arg(&args->p, sizeof str - 1U);  \
+		if (!e) {                                                    \
+			args->m_##tag = args->p.p;                           \
+			return OPT_##tag;                                    \
+		}                                                            \
+		if (e != EAGAIN)                                             \
+			break;
+
 	do {
 		OPTIONS(parse_str)
 		args->p.e = EINVAL;
 	} while (0);
 
 	return OPT_NONE;
+
+	#undef string_str_opt
+	#undef number_str_opt
+	#undef boolean_str_opt
+	#undef parse_str
 }
-
-#undef string_str_opt
-#undef number_str_opt
-#undef boolean_str_opt
-#undef parse_str
-
-#define parse_chr(T, tag, chr, ...)                           \
-	case chr:                                             \
-		++args->p.p;                                  \
-		call(T##_chr_opt,                             \
-		     gen_arg_list(T, tag, chr, __VA_ARGS__),) \
-		return OPT_##tag;
-
-#define boolean_chr_opt(T, tag, ...)          \
-	args->m_##tag = true;                 \
-	if (*args->p.p) {                     \
-		args->seen[OPT_##tag] = true; \
-		goto next;                    \
-	}
-
-#define number_chr_opt(T, tag, chr, str, doc, arg, def, min, max, ...)  \
-	if (!*args->p.p) {                                              \
-		if (++args->p.i >= args->p.c)                           \
-			goto invargs;                                   \
-		args->p.p = args->p.v[args->p.i];                       \
-	}                                                               \
-	if (!letopt_get_number_arg(&args->p, &args->m_##tag, min, max)) \
-		break;
-
-#define string_chr_opt(T, tag, ...)                           \
-	if (!*args->p.p) {                                    \
-		if (++args->p.i >= args->p.c)                 \
-			goto invargs;                         \
-		args->p.p = args->p.v[args->p.i];             \
-	}                                                     \
-	if (!letopt_get_string_arg(&args->p, &args->m_##tag)) \
-		break;
 
 __attribute__((always_inline))
 static inline enum opt_tag
@@ -255,6 +223,39 @@ handle_short_opt (struct letopt *const args)
 	letopt_get_string_arg (struct letopt_state *const state,
 	                       char const **const         dest);
 
+	#define parse_chr(T, tag, chr, ...)                           \
+		case chr:                                             \
+			++args->p.p;                                  \
+			call(T##_chr_opt,                             \
+			     gen_arg_list(T, tag, chr, __VA_ARGS__),) \
+			return OPT_##tag;
+
+	#define boolean_chr_opt(T, tag, ...)          \
+		args->m_##tag = true;                 \
+		if (*args->p.p) {                     \
+			args->seen[OPT_##tag] = true; \
+			goto next;                    \
+		}
+
+	#define number_chr_opt(T,tag,chr,str,doc,arg,def,min,max,...) \
+		if (!*args->p.p) {                                    \
+			if (++args->p.i >= args->p.c)                 \
+				goto invargs;                         \
+			args->p.p = args->p.v[args->p.i];             \
+		}                                                     \
+		if (!letopt_get_number_arg(&args->p, &args->m_##tag,  \
+		                           min, max))                 \
+			break;
+
+	#define string_chr_opt(T, tag, ...)                           \
+		if (!*args->p.p) {                                    \
+			if (++args->p.i >= args->p.c)                 \
+				goto invargs;                         \
+			args->p.p = args->p.v[args->p.i];             \
+		}                                                     \
+		if (!letopt_get_string_arg(&args->p, &args->m_##tag)) \
+			break;
+
 next:
 	switch (*args->p.p) {
 		OPTIONS(parse_chr)
@@ -262,13 +263,14 @@ next:
 	invargs:
 		args->p.e = EINVAL;
 	}
-	return OPT_NONE;
-}
 
-#undef string_chr_opt
-#undef number_chr_opt
-#undef boolean_chr_opt
-#undef parse_chr
+	return OPT_NONE;
+
+	#undef string_chr_opt
+	#undef number_chr_opt
+	#undef boolean_chr_opt
+	#undef parse_chr
+}
 
 static inline struct letopt
 letopt_init (int    argc,
