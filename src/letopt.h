@@ -168,7 +168,7 @@ struct letopt {
 	int e = letopt_get_long_opt_arg(&args->p, sizeof str - 1U);  \
 	if (!e) {                                                    \
 		if (letopt_get_number_arg(&args->p, &args->m_##tag,  \
-		                           min, max))                \
+		                          min, max))                 \
 			return OPT_##tag;                            \
 		break;                                               \
 	}                                                            \
@@ -189,13 +189,13 @@ static inline enum opt_tag
 handle_long_opt (struct letopt *const args)
 {
 	extern int
-	letopt_get_long_opt_arg (struct letopt_state *state,
-	                         size_t               opt_len);
+	letopt_get_long_opt_arg (struct letopt_state *const state,
+	                         const size_t               opt_len);
 	extern bool
-	letopt_get_number_arg (struct letopt_state *state,
-	                       int64_t             *dest,
-	                       int64_t              min,
-	                       int64_t              max);
+	letopt_get_number_arg (struct letopt_state *const state,
+	                       int64_t *const             dest,
+	                       const int64_t              min,
+	                       const int64_t              max);
 
 	do {
 		OPTIONS(parse_str)
@@ -247,13 +247,13 @@ static inline enum opt_tag
 handle_short_opt (struct letopt *const args)
 {
 	extern bool
-	letopt_get_number_arg (struct letopt_state *state,
-	                       int64_t             *dest,
-	                       int64_t              min,
-	                       int64_t              max);
+	letopt_get_number_arg (struct letopt_state *const state,
+	                       int64_t *const             dest,
+	                       const int64_t              min,
+	                       const int64_t              max);
 	extern bool
-	letopt_get_string_arg (struct letopt_state  *state,
-	                       char const          **dest);
+	letopt_get_string_arg (struct letopt_state *const state,
+	                       char const **const         dest);
 
 next:
 	switch (*args->p.p) {
