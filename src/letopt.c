@@ -34,21 +34,27 @@ letopt_get_number_arg (struct letopt_state *const state,
 		return false;
 	}
 
+	errno = 0;
+
 	char *end = state->p;
 	int64_t n = _Generic(n
 		, long: strtol
 		, long long: strtoll
 	)(state->p, &end, 0);
 
-	if (!*end && n >= min && n <= max) {
-		*dest = n;
-		return true;
+	int e = errno;
+	if (!e) {
+		if (*end) {
+			e = EINVAL;
+		} else if (n < min || n > max) {
+			e = ERANGE;
+		} else {
+			*dest = n;
+			return true;
+		}
 	}
 
-	state->e = errno;
-	if (!state->e)
-		state->e = *end ? EINVAL : ERANGE;
-
+	state->e = e;
 	return false;
 }
 
