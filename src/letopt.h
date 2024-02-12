@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: LGPL-2.1-or-later */
-#ifndef NEKROPT_H_
-#define NEKROPT_H_
+#ifndef LETOPT_H_
+#define LETOPT_H_
 
 #if __STDC_VERSION__ < 202000L || (__GNUC__ < 13 && \
     (!defined(__clang_major__) || __clang_major__ < 18))
@@ -27,7 +27,6 @@ struct letopt_state {
 };
 
 #if defined OPTIONS
-#define NEKROPTIONS(X) eval(OPTIONS(X filter_args))
 #define call(f, ...)   f(__VA_ARGS__)
 #define eval(...)      __VA_ARGS__
 #define first(x, ...)  x
@@ -37,6 +36,7 @@ struct letopt_state {
 #define generic_arg(c,s,d,...) c, s, "" first(__VA_ARGS__,), d
 #define number_arg generic_arg
 #define string_arg generic_arg
+#define transformed_options(X) eval(OPTIONS(X filter_args))
 
 #ifdef __clang__
 # pragma clang diagnostic push
@@ -403,11 +403,11 @@ usage (char const *const progname,
 	struct bit0xb_on { const char a[1U << 11U]; };
 
 	#define mk_arr(c, str, arg, ...) c_str(str " " arg " ");
-	typedef char max_align[sizeof(union {NEKROPTIONS(mk_arr)})];
+	typedef char max_align[sizeof(union {transformed_options(mk_arr)})];
 	#undef mk_arr
 
 	(void)printf("Usage: %s %s\n\nOptions:\n%s", progname, synopsis,
-	             help_text(NEKROPTIONS));
+	             help_text(transformed_options));
 }
 
 #ifdef __clang__
@@ -441,6 +441,7 @@ usage (char const *const progname,
 #undef ws0x2
 #undef ws0x1
 #undef ws0x0
+#undef transformed_options
 #undef string_arg
 #undef number_arg
 #undef generic_arg
@@ -449,8 +450,7 @@ usage (char const *const progname,
 #undef first
 #undef eval
 #undef call
-#undef NEKROPTIONS
 
 #endif // OPTIONS
 
-#endif // NEKROPT_H_
+#endif // LETOPT_H_
