@@ -18,7 +18,7 @@ int
 main (int    argc,
       char **argv)
 {
-	struct args args = nekropt_init(argc, argv);
+	struct nekropt args = nekropt_init(argc, argv);
 	do {
 		if (args.p.e)
 			fprintf(stderr, "%s\n", strerror(args.p.e));

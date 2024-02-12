@@ -120,7 +120,7 @@ enum opt_tag {
 #define gen_opt_var(T,...) call(opt_var \
 	, gen_arg_list(T,__VA_ARGS__),)
 
-struct args {
+struct nekropt {
 	struct nekroparser p;
 
 	#define opt_var(T, tag, c, s, d, a, ...) \
@@ -186,7 +186,7 @@ struct args {
 
 __attribute__((always_inline))
 static inline enum opt_tag
-handle_long_opt (struct args *const args)
+handle_long_opt (struct nekropt *const args)
 {
 	extern int
 	nekropt_get_long_opt_arg (struct nekroparser *parser,
@@ -244,7 +244,7 @@ handle_long_opt (struct args *const args)
 
 __attribute__((always_inline))
 static inline enum opt_tag
-handle_short_opt (struct args *const args)
+handle_short_opt (struct nekropt *const args)
 {
 	extern bool
 	nekropt_get_number_arg (struct nekroparser *parser,
@@ -270,7 +270,7 @@ next:
 #undef boolean_chr_opt
 #undef parse_chr
 
-static inline struct args
+static inline struct nekropt
 nekropt_init (int    argc,
               char **argv)
 {
@@ -278,7 +278,7 @@ nekropt_init (int    argc,
 	nekroparser_init (int    argc,
 	                  char **argv);
 
-	struct args args = {
+	struct nekropt args = {
 		.p = nekroparser_init(argc, argv)
 
 		#define opt_var(T, tag, chr, str, doc, arg, ...) \
@@ -345,7 +345,7 @@ nekropt_init (int    argc,
 #undef arg0
 
 static inline int
-nekropt_fini (struct args *args)
+nekropt_fini (struct nekropt *args)
 {
 	int e = args->p.e;
 	free(args->p.q);
