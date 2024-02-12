@@ -4,31 +4,31 @@
 
 #include <gmp.h>
 
-#define OPTIONS(X)                                        \
-	X(boolean, help, 'h', "help",                     \
-	  "print this help text and exit")                \
-	                                                  \
-	X(number,  base, 'B', "base",                     \
-	  "print results in the specified base",          \
-	  "BASE", 10, 2, 62)                              \
-	                                                  \
-	X(boolean, big_endian, 'b', "big-endian",         \
-	  "test primality in big-endian byte order",      \
-	  true)                                           \
-	                                                  \
-	X(boolean, little_endian, 'l', "little-endian",   \
-	  "test primality in little-endian byte order",   \
-	  true)                                           \
-	                                                  \
-	X(boolean, palindromic, 'p', "palindromic",       \
-	  "do not skip byte-level palindromic strings")   \
-	                                                  \
-	X(number,  reps, 'r', "reps",                     \
-	  "run (at most) COUNT primality tests per item", \
-	  "COUNT", 100, 0, INT_MAX)                       \
-	                                                  \
-	X(boolean, single_endian, 's', "single-endian",   \
-	  "do not require both byte orders to be prime")
+#define OPTIONS(X)                                      \
+	X(boolean, help,          'h', "help",          \
+	  "print this help text and exit")              \
+	                                                \
+	X(number,  base,          'B', "base",          \
+	  "print results in specified base",            \
+	  "BASE", 10, 2, 62)                            \
+	                                                \
+	X(boolean, big_endian,    'b', "big-endian",    \
+	  "check primality in big-endian",              \
+	  true)                                         \
+	                                                \
+	X(boolean, little_endian, 'l', "little-endian", \
+	  "check primality in little-endian",           \
+	  true)                                         \
+	                                                \
+	X(boolean, palindromes,   'p', "palindromes",   \
+	  "do not skip byte-level palindromes")         \
+	                                                \
+	X(number,  reps,          'r', "reps",          \
+	  "run at most COUNT primality tests",          \
+	  "COUNT", 100, 0, INT_MAX)                     \
+	                                                \
+	X(boolean, single_endian, 's', "single-endian", \
+	  "do not require both byte orders")
 
 #include "letopt.h"
 
@@ -68,7 +68,7 @@ main (int    argc,
 
 		size_t n = strlen(&s[1]), k = n, j = 0;
 		for (; j < k && s[j] == s[k]; ++j, --k) {}
-		if (j >= k && !args.m_palindromic)
+		if (j >= k && !args.m_palindromes)
 			// byte-level palindrome
 			continue;
 		n++;

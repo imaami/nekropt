@@ -73,17 +73,17 @@ letopt_get_string_arg (struct letopt_state *const state,
 
 int
 letopt_get_long_opt_arg (struct letopt_state *const state,
-                         const size_t               opt_len)
+                         const size_t               len)
 {
 	do {
-		if (!state->p[opt_len]) {
+		if (!state->p[len]) {
 			if (++state->i >= state->c)
 				break;
 			state->p = state->v[state->i];
 		} else {
-			if (state->p[opt_len] != '=')
+			if (state->p[len] != '=')
 				return EAGAIN;
-			state->p += opt_len + 1U;
+			state->p += len + 1U;
 		}
 
 		if (*state->p)
