@@ -14,20 +14,20 @@
 	X(number,  reps,   'r', "reps",   "set primality tests per item",  "COUNT", 100, 0, INT_MAX) \
 	X(boolean, unidir, 'u', "unidir", "include unidirectional primes")
 
-#include "nekropt.h"
+#include "letopt.h"
 
 int
 main (int    argc,
       char **argv)
 {
-	struct nekropt args = nekropt_init(argc, argv);
+	struct letopt args = letopt_init(argc, argv);
 	do {
 		if (args.p.e)
 			fprintf(stderr, "%s\n", strerror(args.p.e));
 		else if (args.p.n && !args.m_help)
 			break;
 		usage(argv[0], "[OPTION]... STRING...");
-		return nekropt_fini(&args);
+		return letopt_fini(&args);
 	} while (0);
 
 	if (args.seen[OPT_le] != args.seen[OPT_be]) {
@@ -99,5 +99,5 @@ main (int    argc,
 	if (args.m_be)
 		mpz_clear(be);
 
-	return nekropt_fini(&args);
+	return letopt_fini(&args);
 }

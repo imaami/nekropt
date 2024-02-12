@@ -1,6 +1,6 @@
 override BIN := example
 
-override SRC_example := example.c nekropt.c
+override SRC_example := example.c letopt.c
 override LIB_example := -lgmp
 
 override SRC := $(foreach b,$(BIN),$(SRC_$b))

@@ -16,7 +16,7 @@
 # include <stdlib.h>
 #endif // OPTIONS
 
-struct nekroparser {
+struct letopt_state {
 	char       **v;
 	int          c;
 	int          e;
@@ -120,8 +120,8 @@ enum opt_tag {
 #define gen_opt_var(T,...) call(opt_var \
 	, gen_arg_list(T,__VA_ARGS__),)
 
-struct nekropt {
-	struct nekroparser p;
+struct letopt {
+	struct letopt_state p;
 
 	#define opt_var(T, tag, c, s, d, a, ...) \
 		T##_var(tag,__VA_ARGS__,)
@@ -165,9 +165,9 @@ struct nekropt {
 	}
 
 #define number_str_opt(T, tag, chr, str, doc, a, def, min, max, ...) \
-	int e = nekropt_get_long_opt_arg(&args->p, sizeof str - 1U); \
+	int e = letopt_get_long_opt_arg(&args->p, sizeof str - 1U);  \
 	if (!e) {                                                    \
-		if (nekropt_get_number_arg(&args->p, &args->m_##tag, \
+		if (letopt_get_number_arg(&args->p, &args->m_##tag,  \
 		                           min, max))                \
 			return OPT_##tag;                            \
 		break;                                               \
@@ -176,7 +176,7 @@ struct nekropt {
 		break;
 
 #define string_str_opt(T, tag, chr, str, ...)                        \
-	int e = nekropt_get_long_opt_arg(&args->p, sizeof str - 1U); \
+	int e = letopt_get_long_opt_arg(&args->p, sizeof str - 1U);  \
 	if (!e) {                                                    \
 		args->m_##tag = args->p.p;                           \
 		return OPT_##tag;                                    \
@@ -186,16 +186,16 @@ struct nekropt {
 
 __attribute__((always_inline))
 static inline enum opt_tag
-handle_long_opt (struct nekropt *const args)
+handle_long_opt (struct letopt *const args)
 {
 	extern int
-	nekropt_get_long_opt_arg (struct nekroparser *parser,
-	                          size_t              opt_len);
+	letopt_get_long_opt_arg (struct letopt_state *state,
+	                         size_t               opt_len);
 	extern bool
-	nekropt_get_number_arg (struct nekroparser *parser,
-	                        int64_t            *dest,
-	                        int64_t             min,
-	                        int64_t             max);
+	letopt_get_number_arg (struct letopt_state *state,
+	                       int64_t             *dest,
+	                       int64_t              min,
+	                       int64_t              max);
 
 	do {
 		OPTIONS(parse_str)
@@ -224,36 +224,36 @@ handle_long_opt (struct nekropt *const args)
 		goto next;                    \
 	}
 
-#define number_chr_opt(T, tag, chr, str, doc, arg, def, min, max, ...)   \
-	if (!*args->p.p) {                                               \
-		if (++args->p.i >= args->p.c)                            \
-			goto invargs;                                    \
-		args->p.p = args->p.v[args->p.i];                        \
-	}                                                                \
-	if (!nekropt_get_number_arg(&args->p, &args->m_##tag, min, max)) \
+#define number_chr_opt(T, tag, chr, str, doc, arg, def, min, max, ...)  \
+	if (!*args->p.p) {                                              \
+		if (++args->p.i >= args->p.c)                           \
+			goto invargs;                                   \
+		args->p.p = args->p.v[args->p.i];                       \
+	}                                                               \
+	if (!letopt_get_number_arg(&args->p, &args->m_##tag, min, max)) \
 		break;
 
-#define string_chr_opt(T, tag, ...)                            \
-	if (!*args->p.p) {                                     \
-		if (++args->p.i >= args->p.c)                  \
-			goto invargs;                          \
-		args->p.p = args->p.v[args->p.i];              \
-	}                                                      \
-	if (!nekropt_get_string_arg(&args->p, &args->m_##tag)) \
+#define string_chr_opt(T, tag, ...)                           \
+	if (!*args->p.p) {                                    \
+		if (++args->p.i >= args->p.c)                 \
+			goto invargs;                         \
+		args->p.p = args->p.v[args->p.i];             \
+	}                                                     \
+	if (!letopt_get_string_arg(&args->p, &args->m_##tag)) \
 		break;
 
 __attribute__((always_inline))
 static inline enum opt_tag
-handle_short_opt (struct nekropt *const args)
+handle_short_opt (struct letopt *const args)
 {
 	extern bool
-	nekropt_get_number_arg (struct nekroparser *parser,
-	                        int64_t            *dest,
-	                        int64_t             min,
-	                        int64_t             max);
+	letopt_get_number_arg (struct letopt_state *state,
+	                       int64_t             *dest,
+	                       int64_t              min,
+	                       int64_t              max);
 	extern bool
-	nekropt_get_string_arg (struct nekroparser  *parser,
-	                        char const         **dest);
+	letopt_get_string_arg (struct letopt_state  *state,
+	                       char const          **dest);
 
 next:
 	switch (*args->p.p) {
@@ -270,41 +270,41 @@ next:
 #undef boolean_chr_opt
 #undef parse_chr
 
-static inline struct nekropt
-nekropt_init (int    argc,
-              char **argv)
+static inline struct letopt
+letopt_init (int    argc,
+             char **argv)
 {
-	extern struct nekroparser
-	nekroparser_init (int    argc,
-	                  char **argv);
+	extern struct letopt_state
+	letopt_state_init (int    argc,
+	                   char **argv);
 
-	struct nekropt args = {
-		.p = nekroparser_init(argc, argv)
+	struct letopt args = {
+		.p = letopt_state_init(argc, argv)
 
 		#define opt_var(T, tag, chr, str, doc, arg, ...) \
 			__VA_OPT__(, .m_##tag = first(__VA_ARGS__,))
 		OPTIONS(gen_opt_var)
 		#undef opt_var
 	};
-	struct nekroparser *parser = &args.p;
-	int options_end  = parser->c;
+	struct letopt_state *state = &args.p;
+	int options_end  = state->c;
 
-	while (!parser->e && ++parser->i < parser->c) {
-		parser->p = parser->v[parser->i];
+	while (!state->e && ++state->i < state->c) {
+		state->p = state->v[state->i];
 
-		if (parser->i >= options_end || *parser->p != '-') {
-			parser->q[parser->n++] = parser->p;
+		if (state->i >= options_end || *state->p != '-') {
+			state->q[state->n++] = state->p;
 			continue;
 		}
 
 		unsigned tag;
 
-		++parser->p;
-		switch (*parser->p) {
+		++state->p;
+		switch (*state->p) {
 		case '-':
-			++parser->p;
-			if (!*parser->p) {
-				options_end = parser->i + 1;
+			++state->p;
+			if (!*state->p) {
+				options_end = state->i + 1;
 				continue;
 			}
 
@@ -324,8 +324,8 @@ nekropt_init (int    argc,
 			continue;
 		}
 
-		if (!parser->e)
-			parser->e = EINVAL;
+		if (!state->e)
+			state->e = EINVAL;
 	}
 
 	return args;
@@ -345,7 +345,7 @@ nekropt_init (int    argc,
 #undef arg0
 
 static inline int
-nekropt_fini (struct nekropt *args)
+letopt_fini (struct letopt *args)
 {
 	int e = args->p.e;
 	free(args->p.q);
