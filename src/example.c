@@ -36,15 +36,17 @@ int
 main (int    argc,
       char **argv)
 {
-	struct letopt args = letopt_init(argc, argv);
-	do {
-		if (args.p.e)
-			fprintf(stderr, "%s\n", strerror(args.p.e));
-		else if (args.p.n && !args.m_help)
-			break;
-		usage(argv[0], "[OPTION]... STRING...");
+	struct letopt args = letopt_init(argc, argv, (struct letopt_help) {
+		.program = "example",
+		.synopsis = "[OPTION]... STRING...",
+		.purpose = "Check ASCII strings for primality.",
+		.details = "By default, check in both byte orders."
+	});
+
+	if (args.p.e || args.p.n < 1 || args.m_help) {
+		letopt_usage(&args);
 		return letopt_fini(&args);
-	} while (0);
+	}
 
 	if (args.seen[OPT_little_endian] != args.seen[OPT_big_endian]) {
 		args.m_little_endian = args.seen[OPT_little_endian];

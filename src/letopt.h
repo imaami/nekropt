@@ -26,6 +26,13 @@ struct letopt_state {
 	char        *p;
 };
 
+struct letopt_help {
+	char const *program;
+	char const *synopsis;
+	char const *purpose;
+	char const *details;
+};
+
 #if defined OPTIONS
 #define call(f, ...)   f(__VA_ARGS__)
 #define eval(...)      __VA_ARGS__
@@ -122,6 +129,7 @@ enum opt_tag {
 
 struct letopt {
 	struct letopt_state p;
+	struct letopt_help  h;
 
 	#define opt_var(T, tag, c, s, d, a, ...) \
 		T##_var(tag,__VA_ARGS__,)
@@ -273,15 +281,17 @@ next:
 }
 
 static inline struct letopt
-letopt_init (int    argc,
-             char **argv)
+letopt_init (int                  argc,
+             char               **argv,
+             struct letopt_help   help)
 {
 	extern struct letopt_state
 	letopt_state_init (int    argc,
 	                   char **argv);
 
 	struct letopt args = {
-		.p = letopt_state_init(argc, argv)
+		.p = letopt_state_init(argc, argv),
+		.h = help
 
 		#define opt_var(T, tag, chr, str, doc, arg, ...) \
 			__VA_OPT__(, .m_##tag = first(__VA_ARGS__,))
@@ -383,8 +393,7 @@ letopt_fini (struct letopt *args)
 
 [[gnu::optimize("Os")]]
 static inline void
-usage (char const *const progname,
-       char const *const synopsis)
+letopt_usage (struct letopt const *const args)
 {
 	#pragma GCC diagnostic push
 	#pragma GCC diagnostic ignored "-Wpedantic"
@@ -408,8 +417,12 @@ usage (char const *const progname,
 	typedef char max_align[sizeof(union {transformed_options(mk_arr)})];
 	#undef mk_arr
 
-	(void)printf("Usage: %s %s\n\nOptions:\n%s", progname, synopsis,
-	             help_text(transformed_options));
+	if (args->p.e)
+		fprintf(stderr, "%s\n", strerror(args->p.e));
+
+	printf("Usage: %s %s\n\n%s\n\n%s\n%s\n",
+	       args->h.program, args->h.synopsis, args->h.purpose,
+	       help_text(transformed_options), args->h.details);
 }
 
 #ifdef __clang__
