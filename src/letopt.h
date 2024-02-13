@@ -2,12 +2,11 @@
 #ifndef LETOPT_H_
 #define LETOPT_H_
 
-#if __STDC_VERSION__ < 202000L || (__GNUC__ < 13 && \
-    (!defined(__clang_major__) || __clang_major__ < 18))
-# include <stdbool.h>
-#endif
-
-#if defined OPTIONS
+#ifdef OPTIONS
+# if __STDC_VERSION__ < 202000L || (__GNUC__ < 13 && \
+     (!defined(__clang_major__) || __clang_major__ < 18))
+#  include <stdbool.h>
+# endif
 # include <errno.h>
 # include <limits.h>
 # include <stddef.h>
@@ -16,6 +15,7 @@
 # include <stdlib.h>
 #endif // OPTIONS
 
+#if defined OPTIONS || defined INCLUDED_FROM_LETOPT_C_
 struct letopt_state {
 	char       **v;
 	int          c;
@@ -25,15 +25,12 @@ struct letopt_state {
 	int          n;
 	char        *p;
 };
+#endif // OPTIONS || INCLUDED_FROM_LETOPT_C_
 
-struct letopt_help {
-	char const *program;
-	char const *synopsis;
-	char const *purpose;
-	char const *details;
-};
+#ifdef OPTIONS
+#define letopt_err(opt)         ((opt)->p.e)
+#define letopt_has(opt, tag)    ((opt)->seen[OPT_##tag])
 
-#if defined OPTIONS
 #define call(f, ...)   f(__VA_ARGS__)
 #define eval(...)      __VA_ARGS__
 #define first(x, ...)  x
@@ -90,7 +87,7 @@ struct letopt_help {
 #define dog(x,y) x##y
 #define cat(x,y) dog(x, y)
 #define sym()    cat(m_, __COUNTER__)
-#define c_str(x) char sym()[sizeof x]
+#define c_str(x) const char sym()[sizeof x]
 
 #define line_align(x) (sizeof(max_align)-sizeof x)
 #define space(x)      ws_type(line_align(x)) sym()
@@ -129,7 +126,6 @@ enum opt_tag {
 
 struct letopt {
 	struct letopt_state p;
-	struct letopt_help  h;
 
 	#define opt_var(T, tag, c, s, d, a, ...) \
 		T##_var(tag,__VA_ARGS__,)
@@ -162,11 +158,11 @@ struct letopt {
 
 __attribute__((always_inline))
 static inline enum opt_tag
-handle_long_opt (struct letopt *const args)
+handle_long_opt (struct letopt *const opt)
 {
 	extern int
 	letopt_get_long_opt_arg (struct letopt_state *const state,
-	                         const size_t               opt_len);
+	                         const size_t               len);
 	extern bool
 	letopt_get_number_arg (struct letopt_state *const state,
 	                       int64_t *const             dest,
@@ -174,21 +170,21 @@ handle_long_opt (struct letopt *const args)
 	                       const int64_t              max);
 
 	#define parse_str(T, tag, chr, str, ...)                           \
-		if (!__builtin_strncmp(args->p.p, str, sizeof str - 1U)) { \
+		if (!__builtin_strncmp(opt->p.p, str, sizeof str - 1U)) {  \
 			call(T##_str_opt,                                  \
 			     gen_arg_list(T, tag, chr, str, __VA_ARGS__),) \
 		}
 
-	#define boolean_str_opt(T, tag, chr, str, ...)  \
-		if (!args->p.p[sizeof str - 1U]) {      \
-			args->m_##tag = true;           \
-			return OPT_##tag;               \
+	#define boolean_str_opt(T, tag, chr, str, ...) \
+		if (!opt->p.p[sizeof str - 1U]) {      \
+			opt->m_##tag = true;           \
+			return OPT_##tag;              \
 		}
 
 	#define number_str_opt(T, tag, chr, str, doc, a, def, min, max, ...) \
-		int e = letopt_get_long_opt_arg(&args->p, sizeof str - 1U);  \
+		int e = letopt_get_long_opt_arg(&opt->p, sizeof str - 1U);   \
 		if (!e) {                                                    \
-			if (letopt_get_number_arg(&args->p, &args->m_##tag,  \
+			if (letopt_get_number_arg(&opt->p, &opt->m_##tag,    \
 			                          min, max))                 \
 				return OPT_##tag;                            \
 			break;                                               \
@@ -197,9 +193,9 @@ handle_long_opt (struct letopt *const args)
 			break;
 
 	#define string_str_opt(T, tag, chr, str, ...)                        \
-		int e = letopt_get_long_opt_arg(&args->p, sizeof str - 1U);  \
+		int e = letopt_get_long_opt_arg(&opt->p, sizeof str - 1U);   \
 		if (!e) {                                                    \
-			args->m_##tag = args->p.p;                           \
+			opt->m_##tag = opt->p.p;                             \
 			return OPT_##tag;                                    \
 		}                                                            \
 		if (e != EAGAIN)                                             \
@@ -207,7 +203,7 @@ handle_long_opt (struct letopt *const args)
 
 	do {
 		OPTIONS(parse_str)
-		args->p.e = EINVAL;
+		opt->p.e = EINVAL;
 	} while (0);
 
 	return OPT_NONE;
@@ -220,7 +216,7 @@ handle_long_opt (struct letopt *const args)
 
 __attribute__((always_inline))
 static inline enum opt_tag
-handle_short_opt (struct letopt *const args)
+handle_short_opt (struct letopt *const opt)
 {
 	extern bool
 	letopt_get_number_arg (struct letopt_state *const state,
@@ -233,43 +229,43 @@ handle_short_opt (struct letopt *const args)
 
 	#define parse_chr(T, tag, chr, ...)                           \
 		case chr:                                             \
-			++args->p.p;                                  \
+			++opt->p.p;                                   \
 			call(T##_chr_opt,                             \
 			     gen_arg_list(T, tag, chr, __VA_ARGS__),) \
 			return OPT_##tag;
 
-	#define boolean_chr_opt(T, tag, ...)          \
-		args->m_##tag = true;                 \
-		if (*args->p.p) {                     \
-			args->seen[OPT_##tag] = true; \
-			goto next;                    \
+	#define boolean_chr_opt(T, tag, ...)         \
+		opt->m_##tag = true;                 \
+		if (*opt->p.p) {                     \
+			opt->seen[OPT_##tag] = true; \
+			goto next;                   \
 		}
 
 	#define number_chr_opt(T,tag,chr,str,doc,arg,def,min,max,...) \
-		if (!*args->p.p) {                                    \
-			if (++args->p.i >= args->p.c)                 \
+		if (!*opt->p.p) {                                     \
+			if (++opt->p.i >= opt->p.c)                   \
 				goto invargs;                         \
-			args->p.p = args->p.v[args->p.i];             \
+			opt->p.p = opt->p.v[opt->p.i];                \
 		}                                                     \
-		if (!letopt_get_number_arg(&args->p, &args->m_##tag,  \
+		if (!letopt_get_number_arg(&opt->p, &opt->m_##tag,    \
 		                           min, max))                 \
 			break;
 
 	#define string_chr_opt(T, tag, ...)                           \
-		if (!*args->p.p) {                                    \
-			if (++args->p.i >= args->p.c)                 \
+		if (!*opt->p.p) {                                     \
+			if (++opt->p.i >= opt->p.c)                   \
 				goto invargs;                         \
-			args->p.p = args->p.v[args->p.i];             \
+			opt->p.p = opt->p.v[opt->p.i];                \
 		}                                                     \
-		if (!letopt_get_string_arg(&args->p, &args->m_##tag)) \
+		if (!letopt_get_string_arg(&opt->p, &opt->m_##tag))   \
 			break;
 
 next:
-	switch (*args->p.p) {
+	switch (*opt->p.p) {
 		OPTIONS(parse_chr)
 	default:
 	invargs:
-		args->p.e = EINVAL;
+		opt->p.e = EINVAL;
 	}
 
 	return OPT_NONE;
@@ -281,24 +277,22 @@ next:
 }
 
 static inline struct letopt
-letopt_init (int                  argc,
-             char               **argv,
-             struct letopt_help   help)
+letopt_init (int    argc,
+             char **argv)
 {
 	extern struct letopt_state
 	letopt_state_init (int    argc,
 	                   char **argv);
 
-	struct letopt args = {
-		.p = letopt_state_init(argc, argv),
-		.h = help
+	struct letopt opt = {
+		.p = letopt_state_init(argc, argv)
 
 		#define opt_var(T, tag, chr, str, doc, arg, ...) \
 			__VA_OPT__(, .m_##tag = first(__VA_ARGS__,))
 		OPTIONS(gen_opt_var)
 		#undef opt_var
 	};
-	struct letopt_state *state = &args.p;
+	struct letopt_state *state = &opt.p;
 	int options_end  = state->c;
 
 	while (!state->e && ++state->i < state->c) {
@@ -320,19 +314,19 @@ letopt_init (int                  argc,
 				continue;
 			}
 
-			tag = handle_long_opt(&args);
+			tag = handle_long_opt(&opt);
 			if (!tag)
 				break;
 
-			args.seen[tag] = true;
+			opt.seen[tag] = true;
 			continue;
 
 		default:
-			tag = handle_short_opt(&args);
+			tag = handle_short_opt(&opt);
 			if (!tag)
 				break;
 
-			args.seen[tag] = true;
+			opt.seen[tag] = true;
 			continue;
 		}
 
@@ -340,7 +334,7 @@ letopt_init (int                  argc,
 			state->e = EINVAL;
 	}
 
-	return args;
+	return opt;
 }
 
 #undef gen_opt_var
@@ -357,19 +351,19 @@ letopt_init (int                  argc,
 #undef arg0
 
 static inline int
-letopt_fini (struct letopt *args)
+letopt_fini (struct letopt *opt)
 {
-	int e = args->p.e;
-	free(args->p.q);
-	__builtin_memset(args, 0, sizeof *args);
+	int e = opt->p.e;
+	free(opt->p.q);
+	__builtin_memset(opt, 0, sizeof *opt);
 	return e;
 }
 
-#define line_vars(chr, str, arg, help)   \
-	const c_str("  -");              \
-	const c_str(", --" str " " arg); \
-	const space(str " " arg);        \
-	const c_str(help);
+#define line_vars(chr, str, arg, help) \
+	c_str("  -");                  \
+	c_str(", --" str " " arg);     \
+	space(str " " arg);            \
+	c_str(help);
 
 #define line_init(chr, str, arg, help) \
 	{ ' ', ' ', '-', chr },        \
@@ -377,23 +371,53 @@ letopt_fini (struct letopt *args)
 	space_init(str " " arg),       \
 	help "\n",
 
-#define help_text(x) ((const union { \
-	const struct {               \
-		x(line_vars)         \
-		const char nul[1];   \
-	};                           \
-	const char str[1U + sizeof ( \
-		struct {             \
-			x(line_vars) \
-		}                    \
-	)];                          \
-}){{                                 \
-	x(line_init) ""              \
+#define help_text(x) ((const union {                 \
+	const struct {                               \
+		c_str(LETOPT_HELP_OVERVIEW);         \
+		x(line_vars)                         \
+		c_str(LETOPT_HELP_DETAILS);          \
+	};                                           \
+	const char str[sizeof (                      \
+		struct {                             \
+			c_str(LETOPT_HELP_OVERVIEW); \
+			x(line_vars)                 \
+			c_str(LETOPT_HELP_DETAILS);  \
+		}                                    \
+	)];                                          \
+}){{                                                 \
+	LETOPT_HELP_OVERVIEW "\n", \
+	x(line_init)               \
+	LETOPT_HELP_DETAILS        \
 }}.str)
+
+#ifdef SYNOPSIS
+# define LETOPT_HELP_SYNOPSIS SYNOPSIS "\n"
+#else // SYNOPSIS
+# define LETOPT_HELP_SYNOPSIS "[OPTION]...\n"
+#endif // SYNOPSIS
+
+#ifdef PURPOSE
+# define LETOPT_HELP_PURPOSE "\n" PURPOSE "\n"
+#else // PURPOSE
+# define LETOPT_HELP_PURPOSE "\nOptions:"
+#endif // PURPOSE
+
+#ifdef PROGNAME
+# define LETOPT_HELP_OVERVIEW \
+	"Usage: " PROGNAME " " LETOPT_HELP_SYNOPSIS LETOPT_HELP_PURPOSE
+#else // PROGNAME
+# define LETOPT_HELP_OVERVIEW LETOPT_HELP_SYNOPSIS LETOPT_HELP_PURPOSE
+#endif // PROGNAME
+
+#ifdef DETAILS
+# define LETOPT_HELP_DETAILS "\n" DETAILS "\n"
+#else // DETAILS
+# define LETOPT_HELP_DETAILS ""
+#endif // DETAILS
 
 [[gnu::optimize("Os")]]
 static inline void
-letopt_usage (struct letopt const *const args)
+letopt_usage (struct letopt const *const opt)
 {
 	#pragma GCC diagnostic push
 	#pragma GCC diagnostic ignored "-Wpedantic"
@@ -413,21 +437,32 @@ letopt_usage (struct letopt const *const args)
 	struct bit0xa_on { const char a[1U << 10U]; };
 	struct bit0xb_on { const char a[1U << 11U]; };
 
-	#define mk_arr(c, str, arg, ...) c_str(str " " arg " ");
+	#define mk_arr(c, str, arg, ...) \
+		char sym()[sizeof str " " arg + (sizeof arg > 1U)];
 	typedef char max_align[sizeof(union {transformed_options(mk_arr)})];
 	#undef mk_arr
 
-	if (args->p.e)
-		fprintf(stderr, "%s\n", strerror(args->p.e));
+	if (opt->p.e)
+		fprintf(stderr, "%s\n", strerror(opt->p.e));
 
-	printf("Usage: %s %s\n\n%s\n\n%s\n%s\n",
-	       args->h.program, args->h.synopsis, args->h.purpose,
-	       help_text(transformed_options), args->h.details);
+#ifdef PROGNAME
+	fputs(help_text(transformed_options), stdout);
+#else // PROGNAME
+	printf("Usage: %s %s", opt->p.v[0],
+	       help_text(transformed_options));
+#endif // PROGNAME
+
+	letopt_fini((struct letopt*)opt);
 }
 
 #ifdef __clang__
 # pragma clang diagnostic pop
 #endif // __clang__
+
+#undef LETOPT_HELP_DETAILS
+#undef LETOPT_HELP_OVERVIEW
+#undef LETOPT_HELP_PURPOSE
+#undef LETOPT_HELP_SYNOPSIS
 
 #undef help_text
 #undef line_init

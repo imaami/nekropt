@@ -4,6 +4,10 @@
 
 #include <gmp.h>
 
+#define PROGNAME "stringy_prime"
+#define SYNOPSIS "[OPTION]... STRING..."
+#define PURPOSE  "Check ASCII strings for primality."
+
 #define OPTIONS(X)                                      \
 	X(boolean, help,          'h', "help",          \
 	  "print this help text and exit")              \
@@ -30,77 +34,74 @@
 	X(boolean, single_endian, 's', "single-endian", \
 	  "do not require both byte orders")
 
+#define DETAILS  "By default, check in both byte orders."
+
 #include "letopt.h"
 
 int
 main (int    argc,
       char **argv)
 {
-	struct letopt args = letopt_init(argc, argv, (struct letopt_help) {
-		.program = "example",
-		.synopsis = "[OPTION]... STRING...",
-		.purpose = "Check ASCII strings for primality.",
-		.details = "By default, check in both byte orders."
-	});
+	struct letopt opt = letopt_init(argc, argv);
 
-	if (args.p.e || args.p.n < 1 || args.m_help) {
-		letopt_usage(&args);
-		return letopt_fini(&args);
+	if (letopt_err(&opt) || opt.p.n < 1 || opt.m_help) {
+		letopt_usage(&opt);
+		return letopt_fini(&opt);
 	}
 
-	if (args.seen[OPT_little_endian] != args.seen[OPT_big_endian]) {
-		args.m_little_endian = args.seen[OPT_little_endian];
-		args.m_big_endian = args.seen[OPT_big_endian];
+	if (letopt_has(&opt, little_endian) != letopt_has(&opt, big_endian)) {
+		opt.m_little_endian = letopt_has(&opt, little_endian);
+		opt.m_big_endian = letopt_has(&opt, big_endian);
 	}
 
-	int base = (int)args.m_base;
-	int reps = (int)args.m_reps;
+	int base = (int)opt.m_base;
+	int reps = (int)opt.m_reps;
 
 	mpz_t le, be;
-	if (args.m_little_endian)
+	if (opt.m_little_endian)
 		mpz_init(le);
-	if (args.m_big_endian)
+	if (opt.m_big_endian)
 		mpz_init(be);
 
-	for (int i = 0; i < args.p.n; i++) {
-		char const *s = args.p.q[i];
+	for (int i = 0; i < opt.p.n; i++) {
+		char const *s = opt.p.q[i];
 		if (!*s)
 			// empty string
 			continue;
 
 		size_t n = strlen(&s[1]), k = n, j = 0;
 		for (; j < k && s[j] == s[k]; ++j, --k) {}
-		if (j >= k && !args.m_palindromes)
+		if (j >= k && !opt.m_palindromes)
 			// byte-level palindrome
 			continue;
 		n++;
 
 		int lp = 3;
-		if (args.m_little_endian) {
+		if (opt.m_little_endian) {
 			mpz_import(le, 1U, -1, n, -1, 0, s);
 			lp = mpz_probab_prime_p(le, reps) & 3;
-			if (!lp && !args.m_single_endian)
+			if (!lp && !opt.m_single_endian)
 				// definitely not prime in little-endian
 				continue;
 		}
 
 		int bp = 3;
-		if (args.m_big_endian) {
+		if (opt.m_big_endian) {
 			mpz_import(be, 1U, -1, n,  1, 0, s);
 			bp = mpz_probab_prime_p(be, reps) & 3;
-			if (!bp && (!args.m_single_endian || !lp))
+			if (!bp && (!opt.m_single_endian || !lp))
 				// definitely not prime in big-endian
 				continue;
 		}
 
 		fputs(s, stdout);
 		putchar('\t');
-		if (args.m_little_endian)
+		if (opt.m_little_endian)
 			mpz_out_str(stdout, base, le);
 		else
 			putchar('-');
 		putchar('\t');
-		if (args.m_big_endian)
+		if (opt.m_big_endian)
 			mpz_out_str(stdout, base, be);
 		else
 			putchar('-');
@@ -112,10 +113,10 @@ main (int    argc,
 		      "\t__"[((bp << 2U) | lp) << 2U]);
 	}
 
-	if (args.m_little_endian)
+	if (opt.m_little_endian)
 		mpz_clear(le);
-	if (args.m_big_endian)
+	if (opt.m_big_endian)
 		mpz_clear(be);
 
-	return letopt_fini(&args);
+	return letopt_fini(&opt);
 }

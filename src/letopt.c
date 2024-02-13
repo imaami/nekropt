@@ -5,7 +5,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define INCLUDED_FROM_LETOPT_C_
 #include "letopt.h"
+#undef INCLUDED_FROM_LETOPT_C_
 
 struct letopt_state
 letopt_state_init (int    argc,
