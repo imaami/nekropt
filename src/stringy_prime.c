@@ -24,12 +24,15 @@
 	  "check primality in little-endian",           \
 	  true)                                         \
 	                                                \
-	X(boolean, palindromes,   'p', "palindromes",   \
-	  "do not skip byte-level palindromes")         \
-	                                                \
 	X(number,  reps,          'r', "reps",          \
 	  "run at most COUNT primality tests",          \
 	  "COUNT", 100, 0, INT_MAX)                     \
+	                                                \
+	X(boolean, always_print,  'a', "always-print",  \
+	  "print all conversions, prime or not")        \
+	                                                \
+	X(boolean, palindromes,   'p', "palindromes",   \
+	  "do not skip byte-level palindromes")         \
 	                                                \
 	X(boolean, single_endian, 's', "single-endian", \
 	  "do not require both byte orders")
@@ -44,14 +47,12 @@ main (int    argc,
 {
 	struct letopt opt = letopt_init(argc, argv);
 
-	if (letopt_err(&opt) || opt.p.n < 1 || opt.m_help) {
-		letopt_usage(&opt);
-		return letopt_fini(&opt);
-	}
+	if (letopt_nargs(&opt) < 1 || opt.m_help)
+		letopt_helpful_exit(&opt);
 
-	if (letopt_has(&opt, little_endian) != letopt_has(&opt, big_endian)) {
-		opt.m_little_endian = letopt_has(&opt, little_endian);
-		opt.m_big_endian = letopt_has(&opt, big_endian);
+	if (opt.has.little_endian != opt.has.big_endian) {
+		opt.m_little_endian = opt.has.little_endian;
+		opt.m_big_endian = opt.has.big_endian;
 	}
 
 	int base = (int)opt.m_base;
@@ -63,24 +64,28 @@ main (int    argc,
 	if (opt.m_big_endian)
 		mpz_init(be);
 
-	for (int i = 0; i < opt.p.n; i++) {
-		char const *s = opt.p.q[i];
+	for (int i = 0; i < letopt_nargs(&opt); i++) {
+		char const *s = letopt_arg(&opt, i);
 		if (!*s)
 			// empty string
 			continue;
 
-		size_t n = strlen(&s[1]), k = n, j = 0;
-		for (; j < k && s[j] == s[k]; ++j, --k) {}
-		if (j >= k && !opt.m_palindromes)
-			// byte-level palindrome
-			continue;
+		size_t n = strlen(&s[1]);
+		if (!opt.m_palindromes) {
+			size_t k = n, j = 0;
+			for (; j < k && s[j] == s[k]; ++j, --k) {}
+			if (j >= k)
+				// byte-level palindrome
+				continue;
+		}
 		n++;
 
 		int lp = 3;
 		if (opt.m_little_endian) {
 			mpz_import(le, 1U, -1, n, -1, 0, s);
 			lp = mpz_probab_prime_p(le, reps) & 3;
-			if (!lp && !opt.m_single_endian)
+			if (!lp && !opt.m_always_print
+			        && !opt.m_single_endian)
 				// definitely not prime in little-endian
 				continue;
 		}
@@ -89,7 +94,9 @@ main (int    argc,
 		if (opt.m_big_endian) {
 			mpz_import(be, 1U, -1, n,  1, 0, s);
 			bp = mpz_probab_prime_p(be, reps) & 3;
-			if (!bp && (!opt.m_single_endian || !lp))
+			if (!bp &&  !opt.m_always_print
+			        && (!opt.m_single_endian
+			            || lp == 0 || lp == 3))
 				// definitely not prime in big-endian
 				continue;
 		}

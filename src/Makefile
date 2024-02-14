@@ -1,7 +1,7 @@
-override BIN := example
+override BIN := stringy_prime
 
-override SRC_example := example.c letopt.c
-override LIB_example := -lgmp
+override SRC_stringy_prime := stringy_prime.c letopt.c
+override LIB_stringy_prime := -lgmp
 
 override SRC := $(foreach b,$(BIN),$(SRC_$b))
 override OBJ := $(SRC:%=%.o)

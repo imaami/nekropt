@@ -28,8 +28,9 @@ struct letopt_state {
 #endif // OPTIONS || INCLUDED_FROM_LETOPT_C_
 
 #ifdef OPTIONS
-#define letopt_err(opt)         ((opt)->p.e)
-#define letopt_has(opt, tag)    ((opt)->seen[OPT_##tag])
+#define letopt_error(opt) ((opt)->p.e)
+#define letopt_nargs(opt) ((opt)->p.n)
+#define letopt_arg(opt,i) ((opt)->p.q[i])
 
 #define call(f, ...)   f(__VA_ARGS__)
 #define eval(...)      __VA_ARGS__
@@ -89,17 +90,6 @@ struct letopt_state {
 #define sym()    cat(m_, __COUNTER__)
 #define c_str(x) const char sym()[sizeof x]
 
-#define line_align(x) (sizeof(max_align)-sizeof x)
-#define space(x)      ws_type(line_align(x)) sym()
-#define space_init(x) ws_init(line_align(x))
-
-#define gen_opt_tag(T,tag,...) OPT_##tag,
-enum opt_tag {
-	OPT_NONE = 0U,
-	OPTIONS(gen_opt_tag)
-};
-#undef gen_opt_tag
-
 #define arg0(def_arg, ...) first(__VA_OPT__(__VA_ARGS__,)def_arg,)
 #define arg1_(def, x, ...) arg0(def,__VA_ARGS__)
 #define arg1(def_arg, ...) arg1_(def_arg,__VA_ARGS__)
@@ -151,13 +141,15 @@ struct letopt {
 	#undef number_var
 	#undef opt_var
 
-	#define increment(...) + 1U
-	bool seen[1U OPTIONS(increment)];
-	#undef increment
+	struct {
+		#define opt_var(T, tag, ...) bool tag;
+		OPTIONS(gen_opt_var)
+		#undef opt_var
+	} has;
 };
 
 __attribute__((always_inline))
-static inline enum opt_tag
+static inline bool
 handle_long_opt (struct letopt *const opt)
 {
 	extern int
@@ -178,15 +170,18 @@ handle_long_opt (struct letopt *const opt)
 	#define boolean_str_opt(T, tag, chr, str, ...) \
 		if (!opt->p.p[sizeof str - 1U]) {      \
 			opt->m_##tag = true;           \
-			return OPT_##tag;              \
+			opt->has.tag = true;           \
+			return true;                   \
 		}
 
 	#define number_str_opt(T, tag, chr, str, doc, a, def, min, max, ...) \
 		int e = letopt_get_long_opt_arg(&opt->p, sizeof str - 1U);   \
 		if (!e) {                                                    \
 			if (letopt_get_number_arg(&opt->p, &opt->m_##tag,    \
-			                          min, max))                 \
-				return OPT_##tag;                            \
+			                          min, max)) {               \
+				opt->has.tag = true;                         \
+				return true;                                 \
+			}                                                    \
 			break;                                               \
 		}                                                            \
 		if (e != EAGAIN)                                             \
@@ -196,7 +191,8 @@ handle_long_opt (struct letopt *const opt)
 		int e = letopt_get_long_opt_arg(&opt->p, sizeof str - 1U);   \
 		if (!e) {                                                    \
 			opt->m_##tag = opt->p.p;                             \
-			return OPT_##tag;                                    \
+			opt->has.tag = true;                                 \
+			return true;                                         \
 		}                                                            \
 		if (e != EAGAIN)                                             \
 			break;
@@ -206,7 +202,7 @@ handle_long_opt (struct letopt *const opt)
 		opt->p.e = EINVAL;
 	} while (0);
 
-	return OPT_NONE;
+	return false;
 
 	#undef string_str_opt
 	#undef number_str_opt
@@ -215,7 +211,7 @@ handle_long_opt (struct letopt *const opt)
 }
 
 __attribute__((always_inline))
-static inline enum opt_tag
+static inline bool
 handle_short_opt (struct letopt *const opt)
 {
 	extern bool
@@ -232,12 +228,13 @@ handle_short_opt (struct letopt *const opt)
 			++opt->p.p;                                   \
 			call(T##_chr_opt,                             \
 			     gen_arg_list(T, tag, chr, __VA_ARGS__),) \
-			return OPT_##tag;
+			opt->has.tag = true;                          \
+			return true;
 
 	#define boolean_chr_opt(T, tag, ...)         \
 		opt->m_##tag = true;                 \
 		if (*opt->p.p) {                     \
-			opt->seen[OPT_##tag] = true; \
+			opt->has.tag = true;         \
 			goto next;                   \
 		}
 
@@ -268,7 +265,7 @@ next:
 		opt->p.e = EINVAL;
 	}
 
-	return OPT_NONE;
+	return false;
 
 	#undef string_chr_opt
 	#undef number_chr_opt
@@ -276,7 +273,10 @@ next:
 	#undef parse_chr
 }
 
-static inline struct letopt
+[[noreturn]] static void
+letopt_helpful_exit (struct letopt *opt);
+
+static struct letopt
 letopt_init (int    argc,
              char **argv)
 {
@@ -293,7 +293,7 @@ letopt_init (int    argc,
 		#undef opt_var
 	};
 	struct letopt_state *state = &opt.p;
-	int options_end  = state->c;
+	int options_end = state->c;
 
 	while (!state->e && ++state->i < state->c) {
 		state->p = state->v[state->i];
@@ -302,8 +302,6 @@ letopt_init (int    argc,
 			state->q[state->n++] = state->p;
 			continue;
 		}
-
-		unsigned tag;
 
 		++state->p;
 		switch (*state->p) {
@@ -314,25 +312,24 @@ letopt_init (int    argc,
 				continue;
 			}
 
-			tag = handle_long_opt(&opt);
-			if (!tag)
+			if (!handle_long_opt(&opt))
 				break;
 
-			opt.seen[tag] = true;
 			continue;
 
 		default:
-			tag = handle_short_opt(&opt);
-			if (!tag)
+			if (!handle_short_opt(&opt))
 				break;
 
-			opt.seen[tag] = true;
 			continue;
 		}
 
 		if (!state->e)
 			state->e = EINVAL;
 	}
+
+	if (state->e)
+		letopt_helpful_exit(&opt);
 
 	return opt;
 }
@@ -350,7 +347,7 @@ letopt_init (int    argc,
 #undef arg1_
 #undef arg0
 
-static inline int
+static int
 letopt_fini (struct letopt *opt)
 {
 	int e = opt->p.e;
@@ -358,6 +355,9 @@ letopt_fini (struct letopt *opt)
 	__builtin_memset(opt, 0, sizeof *opt);
 	return e;
 }
+
+#define space(x)      ws_type(sizeof(max_align) - sizeof x) sym()
+#define space_init(x) ws_init(sizeof(max_align) - sizeof x)
 
 #define line_vars(chr, str, arg, help) \
 	c_str("  -");                  \
@@ -415,8 +415,7 @@ letopt_fini (struct letopt *opt)
 # define LETOPT_HELP_DETAILS ""
 #endif // DETAILS
 
-[[gnu::optimize("Os")]]
-static inline void
+[[gnu::optimize("Os")]] static void
 letopt_usage (struct letopt const *const opt)
 {
 	#pragma GCC diagnostic push
@@ -446,13 +445,18 @@ letopt_usage (struct letopt const *const opt)
 		fprintf(stderr, "%s\n", strerror(opt->p.e));
 
 #ifdef PROGNAME
-	fputs(help_text(transformed_options), stdout);
+	(void)fputs(help_text(transformed_options), stdout);
 #else // PROGNAME
-	printf("Usage: %s %s", opt->p.v[0],
-	       help_text(transformed_options));
+	(void)printf("Usage: %s %s", opt->p.v[0],
+	             help_text(transformed_options));
 #endif // PROGNAME
+}
 
-	letopt_fini((struct letopt*)opt);
+[[noreturn]] static void
+letopt_helpful_exit (struct letopt *opt)
+{
+	letopt_usage(opt);
+	exit(letopt_fini(opt));
 }
 
 #ifdef __clang__
@@ -469,7 +473,6 @@ letopt_usage (struct letopt const *const opt)
 #undef line_vars
 #undef space_init
 #undef space
-#undef line_align
 #undef c_str
 #undef sym
 #undef cat
