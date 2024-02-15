@@ -2,7 +2,7 @@
 #ifndef LETOPT_H_
 #define LETOPT_H_
 
-#ifdef OPTIONS
+#if defined OPTIONS || defined INCLUDED_FROM_LETOPT_C_
 # if __STDC_VERSION__ < 202000L || (__GNUC__ < 13 && \
      (!defined(__clang_major__) || __clang_major__ < 18))
 #  include <stdbool.h>
@@ -13,9 +13,7 @@
 # include <stdint.h>
 # include <stdio.h>
 # include <stdlib.h>
-#endif // OPTIONS
 
-#if defined OPTIONS || defined INCLUDED_FROM_LETOPT_C_
 struct letopt_state {
 	char       **v;
 	int          c;
